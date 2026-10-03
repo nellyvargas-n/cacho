@@ -1,0 +1,3 @@
+'use client';
+import { Component,type ReactNode } from 'react';
+export default class ErrorBoundary extends Component<{children:ReactNode},{failed:boolean}>{state={failed:false};static getDerivedStateFromError(){return {failed:true};}componentDidCatch(e:Error){console.error('Game view failed',e);}render(){if(this.state.failed)return <main className="recovery-screen"><h1>Volvamos a la mesa</h1><p>La pantalla tuvo un problema. Tu último movimiento confirmado sigue guardado.</p><button className="gold-button" onClick={()=>location.reload()}>Recargar el juego</button></main>;return this.props.children;}}

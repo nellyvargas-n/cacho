@@ -1,0 +1,21 @@
+import {describe,it,expect} from 'vitest';
+import {createGame,applyAction,scoreDice,total,CATEGORIES,RULES,type Game,type Mode} from '../lib/game/engine';
+import {actionSchema,createSchema} from '../lib/game/contracts';
+const make=(mode:Mode='alalay')=>createGame('test',['Nelly','Diego'],mode,'human');
+const die=()=>3;
+describe('Cacho rules',()=>{
+ it.each([[1,'ones',5],[2,'twos',10],[6,'sixes',30]] as const)('scores face %i',(face,key,value)=>expect(scoreDice(Array(5).fill(face),key)).toBe(value));
+ it.each([[1,2,3,4,5],[2,3,4,5,6],[1,3,4,5,6]])('accepts a configured straight (%s)',(...dice)=>expect(scoreDice(dice,'straight')).toBe(20));
+ it('awards served bonus only when requested',()=>{expect(scoreDice([2,2,2,5,5],'full',true)).toBe(35);expect(scoreDice([2,2,2,5,5],'full',false)).toBe(30);expect(scoreDice([2,2,2,2,2],'grande',true)).toBe(50);});
+ it('rejects invalid dice',()=>expect(()=>scoreDice([0,2,3,4,5],'straight')).toThrow());
+ it('does not mutate the input',()=>{const g=make();applyAction(g,{type:'ROLL'},die);expect(g.rolls).toBe(0);expect(g.version).toBe(0);});
+ it('requires rolling before scoring or flipping',()=>{expect(()=>applyAction(make(),{type:'SCORE',category:'ones'},die)).toThrow();expect(()=>applyAction(make(),{type:'FLIP',index:0},die)).toThrow();});
+ it('enforces roll and flip budgets',()=>{let g=make('tiro');g=applyAction(g,{type:'ROLL'},die);expect(()=>applyAction(g,{type:'ROLL'},die)).toThrow();g=applyAction(g,{type:'FLIP',index:0},die);expect(g.dice[0]).toBe(4);expect(()=>applyAction(g,{type:'FLIP',index:1},die)).toThrow();});
+ it('preserves selected dice on reroll',()=>{let g=applyAction(make(),{type:'ROLL'},die);g=applyAction(g,{type:'HOLD',index:2},die);g=applyAction(g,{type:'ROLL'},()=>6);expect(g.dice).toEqual([6,6,3,6,6]);});
+ it('resets turn and prevents scoring twice in the same category',()=>{let g=applyAction(make(),{type:'ROLL'},die);g=applyAction(g,{type:'SCORE',category:'threes'},die);expect(g.current).toBe(1);expect(g.rolls).toBe(0);expect(total(g.players[0])).toBe(15);g=applyAction(g,{type:'ROLL'},die);g=applyAction(g,{type:'SCORE',category:'ones'},die);g=applyAction(g,{type:'ROLL'},die);expect(()=>applyAction(g,{type:'SCORE',category:'threes'},die)).toThrow();});
+ it.each(['tiro','alalay','triplete'] as const)('completes an entire %s match against computer',mode=>{let g=createGame('test',['Nelly','CPU'],mode,'computer');let tick=0;const random=()=>++tick%6+1;for(const c of CATEGORIES){g=applyAction(g,{type:'ROLL'},random);g=applyAction(g,{type:'SCORE',category:c.id},random);g=applyAction(g,{type:'CPU'},random);}expect(g.status).toBe('finished');expect(g.turn).toBe(20);expect(g.players.every(p=>Object.keys(p.score).length===10)).toBe(true);expect(()=>applyAction(g,{type:'ROLL'},random)).toThrow();});
+ it('rejects a human action during the computer turn',()=>{let g=createGame('test',['Nelly','CPU'],'alalay','computer');g=applyAction(g,{type:'ROLL'},die);g=applyAction(g,{type:'SCORE',category:'threes'},die);expect(()=>applyAction(g,{type:'ROLL'},die)).toThrow();});
+ it('rejects CPU action on a human turn',()=>expect(()=>applyAction(make(),{type:'CPU'},die)).toThrow());
+ it('preserves all state across save serialization',()=>{let g=applyAction(make(),{type:'ROLL'},die);g=applyAction(g,{type:'HOLD',index:1},die);expect(JSON.parse(JSON.stringify(g))).toEqual(g);});
+ it('validates request inputs',()=>{expect(createSchema.safeParse({names:['','Diego'],mode:'alalay',opponent:'human'}).success).toBe(false);expect(actionSchema.safeParse({actionId:crypto.randomUUID(),expectedVersion:0,action:{type:'FLIP',index:9}}).success).toBe(false);});
+});
