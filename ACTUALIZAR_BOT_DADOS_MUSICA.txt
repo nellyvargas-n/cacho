@@ -1,0 +1,65 @@
+CACHO ALALAY — BOT VISIBLE, DADOS 3D Y MÚSICA
+
+CÓMO ACTUALIZAR TU INSTALACIÓN DE WINDOWS
+
+1. Detén el servidor con Ctrl + C en la terminal.
+2. Descomprime este ZIP en una carpeta temporal.
+3. Copia las carpetas app, components y lib del ZIP dentro de tu carpeta
+   actual cacho. Acepta reemplazar los archivos coincidentes.
+   También puedes copiar tests y este instructivo si quieres las pruebas nuevas.
+4. Dentro de tu carpeta cacho ejecuta:
+
+   pnpm run dev
+
+5. En Chrome elige Mostrar original si la traducción está activa y recarga
+   con Ctrl + Shift + R.
+
+Esta actualización no agrega dependencias ni cambia las tablas de la base.
+Conserva tu carpeta .wrangler: allí están las partidas locales.
+No vuelvas a ejecutar la migración que ya aplicaste.
+Si utilizas pnpm start, ejecuta pnpm run build antes de iniciarlo.
+
+QUÉ CAMBIÓ
+
+- Computadora: ves sus lanzamientos, dados conservados y volteos en orden.
+  Son los valores reales calculados por el servidor, no una animación aleatoria.
+- El resultado permanece unos segundos antes de cambiar a tu turno.
+  Una tarjeta conserva los cinco dados finales, la categoría y los puntos.
+- Dados: cubos de seis caras, profundidad, sombras, giro y rebote. La cara
+  frontal al terminar muestra el valor válido. Los dados conservados no giran.
+- Música: melodía instrumental original generada en el navegador. Comienza
+  después de una interacción; se apaga con el botón de nota musical.
+- Configuración: interruptores separados para música, efectos y animación,
+  además de un control de volumen de música. Las preferencias se recuerdan.
+- Tiradas: efecto de dados golpeando la mesa para la persona y la computadora.
+  Se puede mantener ese sonido aunque la música esté apagada.
+- El audio se pausa al ocultar la pestaña. Las animaciones respetan la opción
+  de movimiento reducido del sistema y del juego.
+- Se indicó translate="no" para reducir la interferencia del traductor
+  automático con React. Esto no sustituye el diagnóstico de otros errores 500.
+
+PARTIDAS ANTERIORES
+
+Siguen siendo compatibles. El detalle de una tirada del bot aparece después
+de su próximo turno; no es posible reconstruir los dados de turnos viejos
+que la versión anterior no guardaba.
+
+VALIDACIÓN
+
+- TypeScript: correcto.
+- Compilación de producción: correcta.
+- Página principal y consulta de partidas: HTTP 200 en el entorno de prueba.
+- API real con D1 local: creación, lanzamiento, anotación, turno del bot y
+  recuperación de los dados/puntos persistidos comprobados.
+- 35 pruebas de motor, repetición del bot, interfaz, audio y cliente API pasaron.
+- Suite completa: 43 pruebas pasaron y 1 prueba de autenticación falló.
+  Se reprodujo el mismo fallo con el ZIP original, antes de estos cambios:
+  tests/service.test.ts espera 401 para una solicitud sin identificación,
+  mientras que la implementación existente permite invitado local y devuelve
+  400 por falta del cuerpo JSON. Esta actualización no modifica esa política.
+- El audio se comprobó con pruebas de su API; no se realizó una escucha ni
+  inspección visual en un navegador real de Windows desde este entorno.
+
+PARA EJECUTAR LAS PRUEBAS DE LAS FUNCIONES ACTUALIZADAS
+
+pnpm exec vitest run tests/engine.test.ts tests/cpu-replay.test.ts tests/audio.test.ts tests/interface.test.tsx tests/api-client.test.ts

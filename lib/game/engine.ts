@@ -14,7 +14,9 @@ export const RULES = {
   triplete:{label:'Triplete',rolls:3,flips:0,description:'3 tiros · sin volteos'},
 };
 export type Player = {name:string;avatar:string;score:Partial<Record<Category,number>>};
-export type Game = {id:string;mode:Mode;opponent:Opponent;players:Player[];current:number;dice:number[];held:boolean[];rolls:number;flips:number;turn:number;version:number;status:'playing'|'finished';createdAt:string;updatedAt:string;lastEvent:string;rulesVersion:1};
+export type CpuStep = {type:'ROLL'|'FLIP';dice:number[];held:boolean[];rolls:number;flips:number};
+export type CpuTurn = {turn:number;steps:CpuStep[];dice:number[];category:Category;points:number};
+export type Game = {id:string;mode:Mode;opponent:Opponent;players:Player[];current:number;dice:number[];held:boolean[];rolls:number;flips:number;turn:number;version:number;status:'playing'|'finished';createdAt:string;updatedAt:string;lastEvent:string;rulesVersion:1;lastCpuTurn?:CpuTurn};
 export type Action = {type:'ROLL'}|{type:'HOLD';index:number}|{type:'FLIP';index:number}|{type:'SCORE';category:Category}|{type:'CPU'};
 export class GameError extends Error { constructor(message:string,public code='INVALID_ACTION',public status=422){super(message);} }
 export function createGame(id:string,names:string[],mode:Mode,opponent:Opponent,avatars=['🧑🏽','👩🏽']):Game {
@@ -62,22 +64,29 @@ function step(g:Game,action:Exclude<Action,{type:'CPU'}>,die:()=>number):Game {
 }
 function cpuTurn(g:Game,die:()=>number):Game{
  let n=structuredClone(g),rules=RULES[n.mode];
+ const steps:CpuStep[]=[];
+ const record=(type:CpuStep['type'])=>steps.push({type,dice:[...n.dice],held:[...n.held],rolls:n.rolls,flips:n.flips});
  if(!n.rolls)n=step(n,{type:'ROLL'},die);
+ record('ROLL');
  while(n.rolls<rules.rolls){
   const options=availableScores(n).filter(x=>!x.used);
   if(options.some(x=>x.face===0&&x.value>=30))break;
   const counts=[1,2,3,4,5,6].map(face=>({face,count:n.dice.filter(d=>d===face).length})).sort((a,b)=>b.count-a.count||b.face-a.face);
   n.held=n.dice.map(d=>d===counts[0].face);if(n.held.every(Boolean))break;
   n=step(n,{type:'ROLL'},die);
+  record('ROLL');
  }
  while(n.flips<rules.flips){
   const best=()=>Math.max(...availableScores(n).filter(x=>!x.used).map(x=>x.value));
   let value=best(),index=-1;
   for(let i=0;i<5;i++){const t=step(n,{type:'FLIP',index:i},die);const v=Math.max(...availableScores(t).filter(x=>!x.used).map(x=>x.value));if(v>value){value=v;index=i;}}
-  if(index<0)break;n=step(n,{type:'FLIP',index},die);
+  if(index<0)break;n=step(n,{type:'FLIP',index},die);record('FLIP');
  }
  const options=availableScores(n).filter(x=>!x.used).sort((a,b)=>b.value-a.value||(a.face||10)-(b.face||10));
- return step(n,{type:'SCORE',category:options[0].id},die);
+ const result:CpuTurn={turn:g.turn,steps,dice:[...n.dice],category:options[0].id,points:options[0].value};
+ n=step(n,{type:'SCORE',category:result.category},die);
+ n.lastCpuTurn=result;
+ return n;
 }
 export function applyAction(g:Game,action:Action,die:()=>number):Game {
  if(g.status==='finished')throw new GameError('La partida ya terminó.');
